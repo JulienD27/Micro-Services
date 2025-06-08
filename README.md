@@ -1,16 +1,29 @@
-# 📘 Documentation : Déploiement du projet ToDo App (React + NestJS + MySQL)
+# 📦 Guide d'installation et de déploiement – Projet ToDo App (React + NestJS + MySQL + Kubernetes)
 
-## 📁 Structure du projet
+---
+
+## 🛠️ 1. Prérequis techniques
+
+- Node.js (v18 ou supérieur)
+- Docker & Docker Hub
+- Docker Compose (optionnel pour dev local)
+- Kubernetes (via Docker Desktop ou Minikube)
+- `kubectl` installé et connecté à ton cluster
+- Un éditeur de code (ex: VS Code)
+
+---
+
+## 🚧 2. Structure du projet
 
 ```
 project-root/
 ├── backend/
-│   ├── todo-list-backend/         # Code NestJS + Prisma
-│   └── Dockerfile                 # Backend image builder
+│   ├── todo-list-backend/         # NestJS + Prisma
+│   └── Dockerfile
 ├── frontend/
-│   ├── todo-list-frontend/        # Code React + Ant Design
-│   └── Dockerfile                 # Frontend image builder
-├── k8s/                           # Fichiers de déploiement Kubernetes
+│   ├── todo-list-frontend/        # React + Ant Design
+│   └── Dockerfile
+├── k8s/                           # YAML Kubernetes
 │   ├── backend-deployment.yaml
 │   ├── backend-service.yaml
 │   ├── frontend-deployment.yaml
@@ -19,140 +32,147 @@ project-root/
 │   ├── mysql-service.yaml
 │   ├── configmap.yaml
 │   ├── secrets.yaml
-│   └── pvc.yaml
+│   └── mysql-pvc.yaml
 ```
 
 ---
 
-## 🚀 1. Docker : Builder et Pusher les images
+## 💻 3. Lancement local en mode développement
 
-### 🔨 Backend (NestJS)
+### 🔹 Backend NestJS (avec Prisma)
 ```bash
-cd backend
-docker build -t jxien/todo-backend:latest .
-docker push jxien/todo-backend:latest
+cd backend/todo-list-backend
+npm install
+npx prisma generate
+npx prisma db push
+npm run start:dev
 ```
 
-### 🎨 Frontend (React)
+### 🔹 Frontend React
 ```bash
-cd frontend
-docker build -t jxien/todo-frontend:latest .
-docker push jxien/todo-frontend:latest
+cd frontend/todo-list-frontend
+npm install
+REACT_APP_API_URL=http://localhost:3000 npm start
 ```
 
-> ⚠️ Change `jxien` si tu utilises un autre nom Docker Hub.
+> L’API sera disponible sur `http://localhost:3000`, le frontend sur `http://localhost:3001`.
 
 ---
 
-## 🧠 2. Variables d’environnement (.env)
+## 🐳 4. Dockerisation du projet
 
-### 📄 Backend (`backend/todo-list-backend/.env`)
-```env
-DATABASE_URL="mysql://todo_user:user123@mysql:3306/tododb"
-PORT=3001
-FRONTEND_URL=http://localhost:3000/
+### 📦 Backend (dans `backend/`)
+```bash
+docker build -t <dockerhub_user>/todo-backend:latest .
+docker push <dockerhub_user>/todo-backend:latest
 ```
 
-### 📄 Frontend (`frontend/todo-list-frontend/.env`)
-```env
-REACT_APP_API_URL=http://localhost:30001/
-PORT=3005
+### 📦 Frontend (dans `frontend/`)
+```bash
+docker build -t <dockerhub_user>/todo-frontend:latest .
+docker push <dockerhub_user>/todo-frontend:latest
 ```
+
+> ⚠️ Change `<dockerhub_user>` par ton identifiant Docker Hub.
 
 ---
 
-## ☸️ 3. Kubernetes : Commandes utiles
+## ⚙️ 5. Déploiement avec Kubernetes
 
-### 📦 Déployer tout
+### 📁 Déployer tous les fichiers YAML dans le namespace `todo-app` :
 ```bash
+kubectl create namespace todo-app
 kubectl apply -f k8s/ -n todo-app
 ```
 
-### 💥 Supprimer tout
+### 🌐 Accès aux services exposés
+- **Frontend** : http://localhost:30080
+- **Backend API** : http://localhost:30001
+
+> Ces ports sont définis dans les `Service` de type `NodePort`.
+
+---
+
+## 🔄 6. Modifier le code source et redéployer
+
+### 🧑‍💻 Étapes pour modifier le code
+
+1. Modifie les fichiers source dans `todo-list-backend/` ou `todo-list-frontend/`
+2. Rebuild l’image Docker correspondante :
+   ```bash
+   docker build -t <user>/todo-backend:latest .     # ou todo-frontend
+   docker push <user>/todo-backend:latest
+   ```
+3. Redéploie avec Kubernetes :
+   ```bash
+   kubectl rollout restart deployment backend -n todo-app   # ou frontend
+   ```
+
+### 📦 Prisma : re-pousser le schéma si modifié
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+---
+
+## ⚙️ 7. Paramètres de configuration importants
+
+### 📄 Backend – `.env`
+```env
+DATABASE_URL="mysql://todo_user:user123@mysql:3306/tododb"
+PORT=3000
+```
+
+### 📄 Frontend – `.env`
+```env
+REACT_APP_API_URL=http://localhost:30001
+```
+
+> En production, utilisez l'adresse du service backend exposé via `NodePort` ou `LoadBalancer`.
+
+---
+
+## 🔐 8. Secrets & ConfigMaps
+
+### 🔑 Secrets (`secrets.yaml`)
+Contient les mots de passe encodés en base64 :
+- `MYSQL_PASSWORD`
+- `DATABASE_URL` pour le backend
+
+### ⚙️ ConfigMap (`configmap.yaml`)
+Contient :
+- `MYSQL_DATABASE`
+- `MYSQL_USER`
+
+---
+
+## 📊 9. Surveillance et gestion
+
+### Voir les pods, services, logs :
+```bash
+kubectl get pods -n todo-app
+kubectl get svc -n todo-app
+kubectl logs deploy/backend -n todo-app
+kubectl logs deploy/frontend -n todo-app
+```
+
+### Redémarrer un service :
+```bash
+kubectl rollout restart deployment backend -n todo-app
+```
+
+### Supprimer les ressources :
 ```bash
 kubectl delete -f k8s/ -n todo-app
 ```
 
-> ou supprimer le namespace complet :
-```bash
-kubectl delete namespace todo-app
-```
-
-### 🔍 Voir les pods
-```bash
-kubectl get pods -n todo-app
-```
-
-### 🔎 Voir les services et les ports exposés
-```bash
-kubectl get svc -n todo-app
-```
-
-### 📂 Voir les déploiements
-```bash
-kubectl get deployments -n todo-app
-```
-
-### 🔁 Redémarrer un déploiement
-```bash
-kubectl rollout restart deployment backend -n todo-app
-kubectl rollout restart deployment frontend -n todo-app
-```
-
-### 📄 Logs d’un pod
-```bash
-kubectl logs <nom-du-pod> -n todo-app
-kubectl logs -f deploy/backend -n todo-app
-```
-
-### 🛑 Supprimer un pod (il sera recréé automatiquement)
-```bash
-kubectl delete pod <nom> -n todo-app
-```
-
 ---
 
-## 🌐 4. Accéder à l’application
+## 📌 10. Notes supplémentaires
 
-### 🖼 Frontend :
-```
-http://localhost:30080
-```
-
-### 🔌 Backend API :
-```
-http://localhost:30001
-```
+- Utilise des `NodePort` en local, mais préfère des `Ingress` ou `LoadBalancer` en cloud.
+- Pour test local, tu peux aussi utiliser `docker-compose` si nécessaire.
+- Garde `.env` et `.yaml` bien synchronisés entre les environnements.
 
 ---
-
-## 🧹 5. Nettoyage Docker
-
-### Supprimer les conteneurs Docker hors Kubernetes
-```bash
-docker rm -f todo-backend todo-mysql todo-frontend
-```
-
-### Supprimer le volume MySQL local
-```bash
-docker volume rm projet-micro-services_mysql_data
-```
-
----
-
-## 💡 Astuces
-
-### Voir tous les namespaces
-```bash
-kubectl get namespaces
-```
-
-### Voir les Secrets en clair
-```bash
-kubectl get secret backend-secret -n todo-app -o yaml
-```
-
-### Test direct de l'API backend
-```bash
-curl http://localhost:30001/tasks
-```

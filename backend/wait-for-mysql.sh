@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "⏳ Attente de MySQL à l'adresse $MYSQL_HOST:$MYSQL_PORT..."
+echo "Attente de MySQL à l'adresse $MYSQL_HOST:$MYSQL_PORT..."
 
 # Par défaut
 : "${MYSQL_HOST:=mysql}"
@@ -8,8 +8,8 @@ echo "⏳ Attente de MySQL à l'adresse $MYSQL_HOST:$MYSQL_PORT..."
 
 # Boucle jusqu'à ce que MySQL réponde
 until nc -z "$MYSQL_HOST" "$MYSQL_PORT"; do
-  echo "⏳ MySQL n'est pas encore prêt - attente..."
+  echo "MySQL n'est pas encore prêt - attente..."
   sleep 2
 done
 
-echo "✅ MySQL est prêt !"
+echo "MySQL est prêt !"
